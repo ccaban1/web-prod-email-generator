@@ -1,0 +1,514 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Email Generator</title>
+</head>
+
+<body>
+	<center><div style="width:800px;">
+	
+	<h1>Email Generator</h1>
+	
+	
+	<div style="display:inline; float:left; margin-left:100px;">
+	
+		<p style="margin-bottom:0px; text-align: left;">Email Template (Optional)</p>
+
+		<p style="margin-top:5px;"><textarea placeholder="Paste email template here" id="txtTemplate" style="width:250px; height:100px; resize:vertical;"></textarea></p>
+		
+		<p style="margin-bottom:0px; text-align: left;">Image Name</p>
+		
+		<p style="margin-top:5px;"><input placeholder="Paste file name of first image here" type="text" id="txtImage_0" style="width:250px;"></p><span id="bannerContainer"></span>
+		
+		<p style="margin-bottom:0px; text-align: left;">Links</p>
+		
+		<p style="margin-top:5px;"><textarea placeholder="Paste CTA links separated by line breaks here" wrap="off" id="txtCTA" style="width:250px; height:140px; resize:vertical;"></textarea></p>
+
+
+		<div> <button onclick="addBanner()">Add Banner</button> &nbsp;&nbsp;&nbsp;&nbsp;<button onclick="generateCode()">Generate Email</button> </div>
+
+
+		<br><br><br><br>
+
+   
+   </div>
+<br>
+<br><div style="display:inline; float:right;" id="outputArea">
+<textarea id="finalOutput" style="white-space: pre-wrap; width:350px; height:350px; resize:vertical;"></textarea>
+<br><span style="margin-right:250px;" id="progressBar"></span><br>
+<button onclick="copyCode()">Copy</button>
+</div>
+</div></center>
+</body>
+
+<script>
+	
+	var linkArray = new Array();	//Array for the links pulled from user input and properly formatted for the email
+	var ctaArray = new Array();		//Array for the CTAs corresponding to each image of the imageArray
+	var imageArray = new Array();	//Array for the images going into the email
+	
+	var bannerCount = 0;			//Total number of additional banners in the email
+	var currentBanner = 0;			//Current banner being worked on
+	
+	var linkOffset = 0;				//Total number of links in all previous banners
+	var nextOffset = 0;				//Number of links in the current banner
+
+	//Variables controlling the loading percentage
+	var loadBar = 0;
+	var progressIncrement;
+	
+	
+	
+	function generateCode(){
+		
+		document.getElementById("progressBar").innerHTML = "Loading... "+loadBar+"%";
+		
+		getCTA();	//Pull links from user input, format and populate linkArray
+		
+		
+		var firstImage = getFirstImage();		//Get initial image filename from user inout
+		
+		checkImage(firstImage);		//Parse file name and check for valid image
+		
+		
+	}
+	
+	
+	/*Get the image and CTA links based on user input and sort the into arrays*/
+	
+	
+	function getCTA(){		//Called by generateCode()
+		
+		//Get user input for links and add line break for proper parsing
+		var ctaString = document.getElementById('txtCTA').value + "\n"; 
+		
+		ctaString = ctaString.replace(/\t/g, "\n");
+		
+		//Determine number of CTAs in the list
+		var numberOfLines = (ctaString.match(/\n/g) || []).length;
+		
+		progressIncrement = Math.floor(100 / numberOfLines);
+		
+		
+		//Break up the CTAs by line break and add them to link Array
+		for(var i = 0; i< numberOfLines; i++){
+			var endLine = ctaString.indexOf("\n");
+			
+			var thisCTA = ctaString.substring(0,endLine);
+			
+			
+			//Properly formats the links before adding them to array
+			linkArray[i] = buildCTA(thisCTA);		
+			
+			ctaString = ctaString.substring(endLine+1);
+			
+			
+		}
+		
+		
+	}
+	
+	
+	
+	function buildCTA(strCTA){		//Called by getCTA()
+		
+		var givenURL = strCTA.trim();		//Remove excess white space from link
+		
+		var absoluteCheck = givenURL.indexOf("http");		//Check to see whether a link is absolute or relative
+		var parameterCheck = givenURL.indexOf("?");		//Check to see whethere a link already has a parameter
+		
+		var completeURL;
+		
+		//Append lordandtaylor.com to relative links
+		if(absoluteCheck == -1){
+			completeURL = "http://www.lordandtaylor.com"+givenURL;
+		}else{
+			completeURL = givenURL;
+		}
+		
+		//Use ? for links without any existing parameters, otherwise use &
+		if(parameterCheck == -1){
+			completeURL = completeURL+"?";
+		}else{
+			completeURL = completeURL+"&";
+		}
+		
+		//Append email sre tag to url
+		completeURL = completeURL + "email=%%CUSTOM_HASH_EMAIL%%&site_refer=%%REF_ID%%"
+		
+		return completeURL;
+	}
+	
+	function getFirstImage(){		//Called by generateCode()
+		
+		var fileName = document.getElementById('txtImage_'+currentBanner).value;		//Get initial image name from user input
+		
+		return fileName;
+		
+	}
+	
+	function checkImage(imageName){		//Called by generateCode(), getNextImage()
+		
+		
+		var img = new Image();
+		
+		//Fine the place in the image name with the ID to determine what link is associated with the image
+		var linkIndex = imageName.lastIndexOf("-");
+		
+		//Get the number of the associated link
+		var linkNumber = parseInt(imageName.substring(linkIndex+1))-1;
+		
+		
+		//Find the place in the image name with the index number corresponding to the image's place in the email
+		var imageIndex = imageName.lastIndexOf("_");
+		
+		//Get the number that determines the image's place in the email
+		var imageNumber = parseInt(imageName.substring(imageIndex+1,linkIndex));
+		
+		
+		//Check for valid image, then check to see if there is an animated gif associated with the file name
+		img.addEventListener("load", function(){
+			if(this.naturalWidth > 1 && this.naturalHeight > 1){
+				
+				//Increment the loading percentage
+				loadBar+=progressIncrement;
+				
+				//Keeps loading percentage from reaching or going over 100% before finishing
+				if(loadBar > 90){
+					loadBar = 90;
+				}
+				
+				//Display the loading percentage
+				document.getElementById("progressBar").innerHTML = "Loading... "+loadBar+"%";
+				
+				//Check to see if the loaded image is animated
+				checkAnimation(imageName, linkNumber, imageNumber, this.naturalWidth);
+				
+			}else{
+				linkNumber++;
+			 
+			 	getNextImage(imageName, linkNumber, imageNumber);
+			}
+			
+		});
+		
+		img.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+imageName+'?scl=1&qlt=100&fmt=jpg';
+		
+		//If there is no valid image, check the next possible file name in sequence
+		img.onerror = function(){
+			
+			linkNumber+=2;
+			getNextImage(imageName, linkNumber, imageNumber);
+		}
+		
+	}
+	
+
+	function getNextImage(imageName, linkNumber, imageNumber){		//Called by checkImage(), getImageLink()
+		
+		//Generate the next possible image name in sequence. If all possible names have been used up, generate the email
+		if((linkNumber+linkOffset) <= linkArray.length){
+			var endIndex = imageName.lastIndexOf("_");
+			
+			var coreName = imageName.substring(0,endIndex);
+			
+			var newName = coreName+"_"+imageNumber+"-"+linkNumber;
+			
+			
+			
+			checkImage(newName);
+			
+		}else if(currentBanner < bannerCount){
+			
+			currentBanner++;
+			
+			linkOffset += nextOffset;
+			
+			nextOffset = 0;
+			
+			var nextImage = getFirstImage();
+			
+			checkImage(nextImage);
+			
+			
+		}else{
+			
+			assembleCode();
+			
+		}
+		
+		
+	}
+	
+	
+	function checkAnimation(imageName, linkNumber, imageNumber, imageWidth){		//Called by checkAnimation()
+		
+		var startURL = "http://image.s5a.com/is/content/LordandTaylor/EMAIL/2018/Week%20";
+		
+		//Get the week number for the folder name from the name of the image
+		var weekNumber = parseInt(imageName.substring(0,2));
+		
+		//Change underscores to conform to animated link format
+		var animationName = imageName.replace(/_/g,"%5F");
+		
+		var srcAnimation = startURL+weekNumber+"/"+animationName+".gif";
+		
+		var anim = new Image();
+		
+		//If there is an available animated gif, add to image array and corresponding link to CTA array
+		anim.addEventListener("load", function(){
+			this.imgNum = imageNumber; //Findme
+
+			imageArray.push(this);
+			ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+			
+			if(linkNumber >= nextOffset){
+				nextOffset = linkNumber+1;
+			}
+			linkNumber = 1;
+			imageNumber++;
+			getNextImage(imageName, linkNumber, imageNumber);
+			
+		});
+		
+		anim.src = srcAnimation;
+		
+		//If there is no corresponfing animation, build the link for a static image
+		anim.onerror = function(){
+			getImageLink(imageName, linkNumber, imageNumber, imageWidth);
+		}
+	}
+	
+	
+	
+	function getImageLink(imageName, linkNumber, imageNumber, imageWidth){		//Called by checkAnimation()
+		
+		var img = new Image();
+		
+		//Add image to imageArray and corresponding link to ctaArray, then check for next image
+		img.addEventListener("load", function(){
+			this.imgNum = imageNumber;
+
+			imageArray.push(this);
+			ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+			
+			if(linkNumber >= nextOffset){
+				nextOffset = linkNumber+1;
+			}
+			
+			linkNumber = 1;
+			imageNumber++;
+			
+			getNextImage(imageName,linkNumber,imageNumber);
+			
+		});
+		//Build the source link for the image
+		img.src="http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?wid="+imageWidth+"&qlt=100&fmt=jpg";
+		
+		//If there is no image available at this point, throw up an error
+		img.onerror = function(){alert("The image "+imageName+" was not found.");}
+	}
+	
+	
+	/*Build the HTML*/
+	
+	function assembleCode(){		//Called by getNextImage()
+		
+		var mainContent = "";	//Variable that will contain all of the email code being built
+		
+		//Get a copy of the email template for this email if provided by the user
+		var template = document.getElementById('txtTemplate').value;	
+		
+		//Split off the section of the tempalte that comes before the area edited by production
+		var templateOpen = getTemplateOpen(template);
+		//Split off the section of the template that comes after the area edited by production
+		var templateClose = getTemplateClose(template);
+		//Table used for spacing out elements
+		var spacingTable = "<table width=\"600\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" \nalign=\"center\" class=\"mainContent\"> \n	<tr>\n        <td height=\"6\" bgcolor=\"#f5f5f5\"> </td>\n     </tr>\n      </table>\n";
+		
+		//Build out the image tables and add them to the mainContent variable
+		for(var i = 0; i < imageArray.length; i++){
+			if(imageArray[i].naturalWidth == 600){		//Determine if the image is full width
+				
+
+
+				var thisTable = buildTable(i);		//Build out a full width image table
+				
+
+				if(imageArray[i].imgNum == 1 && i > 0){
+					
+
+					thisTable = spacingTable + thisTable;
+				}
+
+
+				mainContent = mainContent + thisTable;		//Add table to the main content area
+				
+			}else if(imageArray[i].naturalWidth < 600){		//For images that are not full width
+				
+				var totalWidth = 0;		//Keep track of the total height so far
+				
+				//Determine the height that will be used for each table cell
+				var cellHeight = imageArray[i].naturalHeight;	
+				
+				var thisTable = "\n\n     <table width=\"600\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" \nalign=\"center\"\nclass=\"mainContent\">\n      <tr>";
+				
+				//Iterate through images until all images are checked, the total width for the table exceeds what is allowed or you come to an image with a non-matching height
+				for(var u = i; u < imageArray.length && totalWidth < 600 && imageArray[u].naturalHeight == cellHeight; u++){
+					totalWidth += imageArray[u].naturalWidth;
+					
+					//Build the table cell for the image
+					if(totalWidth <= 600){
+						var cellOpen = "\n        <td align=\"center\" style=\"line-height:0px; font-size:0px;\"><a \nhref=\"";
+						
+						var cellCTA = ctaArray[u];
+						
+						var cellMiddle = "\"><img \nsrc=\"";
+						
+						var imageLink = imageArray[u].src;
+						
+						var cellWidthTag = "\" \nalt=\"Shop Now\" width=\"";
+						
+						var cellWidth = imageArray[u].naturalWidth;
+						
+						var cellHeightTag = "\" height=\"";
+						
+						var cellClose = "\" border=\"0\" class=\"img5\" \nstyle=\"display:block;\" \n/></a></td>";
+						
+						
+						var thisCell = cellOpen + cellCTA + cellMiddle + imageLink + cellWidthTag + cellWidth + cellHeightTag + cellHeight + cellClose;
+						
+						thisTable = thisTable + thisCell;
+						
+					}
+					
+					
+					//Update higher loop to check starting from the next image
+					i = u;
+				}
+				
+				var tableClose = "\n      </tr>\n      </table>\n\n"
+					
+				thisTable = thisTable + tableClose;		//Complete image table
+				
+
+				if(imageArray[i].imgNum == 1 && i > 0){
+
+					thisTable = spacingTable + thisTable;
+				}
+
+
+				mainContent = mainContent + thisTable;		//Add table to content area
+				
+			}else{
+				alert("One or more images has incorrect dimensions");	//Throw an error for image widths greater than 600
+			}
+			
+		}
+		
+		document.getElementById("progressBar").innerHTML = "Loading... 100%";
+		
+		//Assemble the email from the code snippets
+		var completeCode = templateOpen+mainContent+spacingTable+templateClose;
+		
+		//Display code to user
+		document.getElementById('outputArea').style.display = "block";
+		document.getElementById('finalOutput').value = completeCode;
+		document.getElementById("progressBar").innerHTML = "";
+		
+		//Reset lists
+		linkArray = new Array();	
+		ctaArray = new Array();	
+		imageArray = new Array();
+		loadBar = 0;
+		linkOffset = 0;
+		nextOffset = 0;
+		currentBanner = 0;
+		
+	}
+	
+	//Splits out the template code above the area being edited
+	function getTemplateOpen(template){		//Called by assembleCode()
+		var startIdentifier = "at the end of link URLs -->"
+		
+		var openIndex = template.indexOf(startIdentifier);
+		
+		var oT = template.slice(0,openIndex+startIdentifier.length);
+		
+		return oT;
+		
+	}
+	
+	//Splits out the template code below the area being edited
+	function getTemplateClose(template){		//Called by assembleCode()
+		var endIdentifier = "<!-- END MAIN CONTENT -->"
+		
+		var openIndex = template.indexOf(endIdentifier);
+		
+		var cT = template.slice(openIndex,template.length);
+		
+		return cT;
+		
+	}
+	
+	//Builds the image table for full width images
+	function buildTable(indexNumber){		//Called by assembleCode()
+		var tableOpen = "\n\n     <table width=\"600\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" \nalign=\"center\" class=\"mainContent\">\n   <tr>\n        <td align=\"center\" style=\"line-height:0px; font-size:0px;\"><a \nhref=\"";
+		
+		var ltURL = ctaArray[indexNumber]; 
+		
+		var tableImage = "\"><img \nsrc=\"";
+		
+		var imageURL = imageArray[indexNumber].src;
+		
+		var tableMiddle = "\" \nalt=\"Shop Now\" width=\"";
+		
+		var tableWidth = imageArray[indexNumber].naturalWidth;
+		
+		var tableHeightTag = "\" height=\"";
+		
+		var tableHeight = imageArray[indexNumber].naturalHeight;
+		
+		var tableEnd = "\" border=\"0\" class=\"img1\" \nstyle=\"display:block;\" \n/></a>\n</td>\n      </tr>\n      </table>\n\n";
+		
+		var thisTable = tableOpen + ltURL + tableImage + imageURL + tableMiddle + tableWidth + tableHeightTag + tableHeight + tableEnd;
+		
+		return thisTable;
+		
+	}
+		
+	//Copies the code in the output text area
+	function copyCode(){
+		var copiedCode = document.getElementById("finalOutput");
+		
+		copiedCode.select();
+		
+		document.execCommand("Copy");
+		
+	}
+	
+	
+	//Add input line to allow for an additional banner
+	function addBanner(){
+		
+		bannerCount++;
+		
+		var bannerHTML ="";
+		
+		for(var i = 1; i<= bannerCount; i++){
+			
+			bannerHTML = bannerHTML+"<p style=\"margin-top:5px;\"><input placeholder=\"Paste file name of first image here\" type=\"text\" id=\"txtImage_"+i+"\" style=\"width:250px;\"></p>";
+			
+		}
+		
+		
+		
+		document.getElementById("bannerContainer").innerHTML = bannerHTML;
+		
+	}
+	
+	</script>
+
+
+</html>
