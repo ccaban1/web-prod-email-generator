@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Email Generator</title>
+
+
+<script type="text/javascript" src="http://www.google.com/jsapi"></script>
+
 </head>
 
 <body>
@@ -26,7 +30,7 @@
 		<p style="margin-top:5px;"><textarea placeholder="Paste CTA links separated by line breaks here" wrap="off" id="txtCTA" style="width:250px; height:140px; resize:vertical;"></textarea></p>
 
 
-		<div> <button onclick="addBanner()">Add Banner</button> &nbsp;&nbsp;&nbsp;&nbsp;<button onclick="generateCode()">Generate Email</button> </div>
+		<div> <button onclick="addBanner()">Add Banner</button> &nbsp;<button onclick="getBannerTable()">Auto-fill</button>&nbsp;<button onclick="generateCode()">Generate Email</button> </div>
 
 
 		<br><br><br><br>
@@ -43,6 +47,13 @@
 </body>
 
 <script>
+	//Load Google Visualizations
+	google.load('visualization', '1', {
+		callback: function () {
+
+		}
+	});
+	 
 	
 	var linkArray = new Array();	//Array for the links pulled from user input and properly formatted for the email
 	var ctaArray = new Array();		//Array for the CTAs corresponding to each image of the imageArray
@@ -58,7 +69,458 @@
 	var loadBar = 0;
 	var progressIncrement;
 	
+	var tabName;					//Name of the google doc sheet
+	var dateString;					//String corresponding to email date
+	var emailTable;					//Table containing the email data
+	var bannerTable;				//Table containing the banner data
+	var linkString = '';			//String containing the links 
 	
+	var printpass = '';				//Printpass link
+	
+	
+	/*Auto-fill Code*/
+	
+	//Pull banner and linking information from the google doc
+	
+	function autoFill(){
+		document.getElementById('progressBar').style.marginRight = '220px';
+		document.getElementById('progressBar').innerHTML = 'Looking for email...'
+		
+		linkString = '';
+		
+		for(var i = 0; i <= bannerCount; i++){
+			var bannerName = document.getElementById("txtImage_"+i).value;
+
+			var emailName = parseEmailName(bannerName);
+
+			if(bannerName.indexOf("_BANNER_") == -1){
+				
+
+				var rowNum = findRow(emailName);
+
+				var columnNum = 14;
+
+				var moreRows = true;
+
+				while(moreRows){
+					linkString = linkString + emailTable.getDataTable().getValue(rowNum,columnNum);
+					
+					if(emailTable.getDataTable().getValue(rowNum,columnNum+1) == null){
+						moreRows = false;
+						linkString = linkString+'\n';
+					}else{
+						columnNum++;
+						linkString = linkString+'\n';
+					}
+				}
+				
+			}else{
+				var rowNum = findBannerRow(emailName);
+
+				var columnNum = 2;
+
+				var moreRows = true;
+
+				while(moreRows){
+					linkString = linkString + bannerTable.getDataTable().getValue(rowNum,columnNum);
+					
+					if(bannerTable.getDataTable().getValue(rowNum,columnNum+1) == null){
+						moreRows = false;
+						linkString = linkString+'\n';
+					}else{
+						columnNum++;
+						linkString = linkString+'\n';
+					}
+				}
+			}
+			
+		}
+		
+		document.getElementById('txtCTA').value = linkString;
+		
+		document.getElementById('progressBar').style.marginRight = '250px';
+		document.getElementById('progressBar').innerHTML = ''
+		
+	}
+	
+	
+	function checkBanners(row){
+		
+		document.getElementById('progressBar').style.marginRight = '200px';
+		document.getElementById('progressBar').innerHTML = 'Fetching urls...'
+		
+		var banners = true;
+		
+		if(emailTable.getDataTable().getValue(row,5) == null){
+			banners = false;
+		}
+		
+		if(banners){
+			var bannerInfo = emailTable.getDataTable().getValue(row,5);
+			
+			
+			if(bannerInfo.indexOf('NO PRODUCTION') == -1){
+				if(bannerInfo.indexOf("_BANNER_") > -1){
+					if((bannerInfo.indexOf('PU ') == -1) && (bannerInfo.indexOf('PICK UP') == -1)){
+						var bannerNumber = bannerInfo.match(new RegExp("_BANNER_","g") || []).length;
+
+						if(bannerNumber > 0){
+							for(var i = 0; i < bannerNumber; i++){
+								var bannerStart = bannerInfo.indexOf("_BANNER_") - 9;
+
+
+
+								//Begin Code to Audit
+								if((bannerInfo.substring(bannerStart,bannerInfo.length)).indexOf("\n") == -1){
+
+									var bannerEnd = bannerInfo.substring(bannerStart,bannerInfo.length).length + bannerStart;
+								}else{
+									var bannerEnd = (bannerInfo.substring(bannerStart,bannerInfo.length)).indexOf("\n") + bannerStart;
+								}
+
+
+
+
+
+								var newBanner = bannerInfo.substring(bannerStart,bannerEnd);
+
+								if(bannerInfo.substring(0,bannerStart).indexOf("ABOVE HERO") > -1){
+									addBanner();
+									var bannerId = "txtImage_"+bannerCount;
+									var lastBannerId = "txtImage_"+(bannerCount-1);
+
+
+									document.getElementById(bannerId).value = document.getElementById(lastBannerId).value;
+
+									document.getElementById(lastBannerId).value = newBanner;
+
+								}else if((bannerInfo.substring(0,bannerStart).indexOf("BELOW HERO") > -1) || (bannerInfo.substring(0,bannerStart).indexOf("BELOW F1") > -1)){
+									addBanner();
+
+									var bannerId = "txtImage_"+bannerCount;
+
+									document.getElementById(bannerId).value = newBanner;
+								}else{
+									alert("There was a problem reading the banner info");
+
+								}
+
+								bannerInfo = bannerInfo.substring(bannerEnd,bannerInfo.length);
+								//End Code to Audit
+							}
+						}
+					}else{
+						alert('Auto-fill does not currently support picking up content from past emails');
+						document.getElementById('progressBar').style.marginRight = '250px';
+						document.getElementById('progressBar').innerHTML = ''
+						throw '';
+					}
+				}
+			}else{
+				alert('No production needed for this email')
+				document.getElementById('progressBar').style.marginRight = '250px';
+				document.getElementById('progressBar').innerHTML = '';
+				throw '';
+			}
+		}
+		
+		findBanners(bannerCount);
+	}
+	
+	//Find the correct image names for each banner; Section needs updating for better error-proofing of exceptions
+	function findBanners(bannerIndex){
+		var imageName = document.getElementById("txtImage_"+bannerIndex).value;
+		
+		
+		imageName = imageName.replace('&','')
+		
+		var img = new Image();
+		if(imageName.indexOf("_1-") == -1){
+			img.addEventListener("load", function(){
+
+				document.getElementById("txtImage_"+bannerIndex).value = imageName+"_1-1";
+				if(bannerIndex > 0){
+					bannerIndex--;
+					findBanners(bannerIndex);
+				}else{
+					autoFill();
+				}
+
+			});
+
+			img.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+imageName+'_1-1?scl=1&qlt=100&fmt=jpg';
+
+			img.onerror = function(){
+				var img2 = new Image();
+
+				img2.addEventListener("load", function(){
+					document.getElementById("txtImage_"+bannerIndex).value = imageName+"_DEV_1-1";
+				if(bannerIndex > 0){
+					bannerIndex--;
+					findBanners(bannerIndex);
+				}else{
+					autoFill();
+				}
+
+				});
+
+				img2.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+imageName+'_DEV_1-1?scl=1&qlt=100&fmt=jpg';
+
+				img2.onerror = function(){
+
+					alert("Unable to find banner");
+
+				}
+
+			}
+		}else if(bannerIndex > 0){
+			bannerIndex--;
+			findBanners(bannerIndex);
+		}else{
+			autoFill();
+		}
+		
+	}
+	
+	function parseEmailName(name){
+		
+		if(name.indexOf("_BANNER_") == -1)
+			if(name.indexOf('_') == 2){
+				name = name.substring(3,name.length);
+			}
+		
+		var cutoff = name.indexOf('_1-');
+		
+		name = name.substring(0,cutoff);
+		
+		name = name.replace('_DEV','')
+		
+		name = name.replace('&','')
+		
+		return name;
+	}
+	
+	function findRow(comparison){
+		var row = -1;
+		var docName;
+		var errorCheck = true;
+		
+		var numCheck = emailTable.getDataTable().getNumberOfRows()-1;
+		
+		
+		do{
+			if(row<numCheck){
+			 	row++;
+			}else{
+				errorCheck = false;
+			}
+			
+			
+			
+			docName = emailTable.getDataTable().getValue(row,2);
+			
+			docName = docName.replace('&','');
+			
+			
+			
+		}while(!(docName==comparison) && errorCheck)
+		
+			if(errorCheck){
+				return row;
+			}else{
+				alert('There was a problem finding this email')
+				
+				document.getElementById('progressBar').style.marginRight = '250px';
+				document.getElementById('progressBar').innerHTML = '';
+				throw '';
+			}
+	}
+	
+	
+	
+	function findBannerRow(comparison){
+		var row = -1;
+		var docName;
+		var errorCheck = true;
+		
+		var numCheck = bannerTable.getDataTable().getNumberOfRows()-1;
+		
+		
+		do{
+			if(row<numCheck){
+			 	row++;
+			}else{
+				errorCheck = false;
+			}
+			
+			
+			
+			docName = bannerTable.getDataTable().getValue(row,1);
+			
+			docName = docName.replace('&','');
+			
+			docName = docName.replace('_1-1','');
+			
+			docName = docName.replace('_DEV','');
+			
+			
+			comparison = comparison.replace('&','');
+			
+			comparison = comparison.replace('_1-1','');
+			
+			comparison = comparison.replace('_DEV','');
+			
+			
+			
+		}while(!(docName==comparison) && errorCheck)
+		
+			if(errorCheck){
+				return row;
+			}else{
+				alert('There was a problem finding this banner')
+				
+				document.getElementById('progressBar').style.marginRight = '250px';
+				document.getElementById('progressBar').innerHTML = '';
+				throw '';
+			}
+	}
+	
+	
+	
+	function getBannerTable(){
+		document.getElementById('progressBar').style.marginRight = '200px';
+		document.getElementById('progressBar').innerHTML = 'Accessing Google Doc...';
+		
+		var query = new google.visualization.Query('https://docs.google.com/spreadsheets/d/1RZdWNvWdYCU3nTGD_SAuHIhhXeOR5HYBLl5r8RcVH88/gviz/tq?tqx=out:html&tq&sheet=BANNER');
+		query.send(loadBannerData);
+	}
+	
+	function loadBannerData(response){
+		bannerTable=response;
+		
+		getTabName();
+	}
+	
+	function getTabName(){	
+		
+		var firstImage = getFirstImage();
+		
+		dateString = getDateString(firstImage);
+		
+		tabName = parseDate();
+		
+		queryTab();
+		
+		
+	}
+	
+	function getDateString(imageName){		//Called by getTabName()
+		
+		
+		
+		var dateString = imageName.substring(3,9);
+		
+		
+		return dateString;
+	}
+	
+	
+	function parseDate(){		//called by getTabName()
+		
+		var monthRaw = parseInt(dateString.substring(0,2));
+		var dayRaw = parseInt(dateString.substring(2,4));
+		
+		
+		var tabDate = monthRaw+"/"+dayRaw;
+		
+		return tabDate;
+	}
+	
+	function queryTab(){
+		var query = new google.visualization.Query('https://docs.google.com/spreadsheets/d/1RZdWNvWdYCU3nTGD_SAuHIhhXeOR5HYBLl5r8RcVH88/gviz/tq?tqx=out:html&tq&sheet='+tabName+'%20Pub');
+		query.send(checkSheet);
+		
+	}
+	
+	function checkSheet(response){
+		
+		var rowNum = 0;
+		
+		var cell; 
+		
+		
+		cell = response.getDataTable().getValue(rowNum,2);
+		
+		//Check for Trigger emails and skip over them
+		while (!(cell.indexOf('TRIGGER') == -1)){
+			rowNum++;
+			cell = response.getDataTable().getValue(rowNum,2);
+		}
+		
+		var emailDate = dateString.substring(4,6) + dateString.substring(0,4);
+		
+		var cellDate = cell.substring(4,6) + cell.substring(0,4);
+		
+		
+		
+		if(cellDate > emailDate){
+			decreaseTabName();
+			queryTab();
+			
+		}else if(cellDate < (emailDate - 8900)){
+			decreaseTabName();
+			queryTab();
+		}else{
+			emailTable = response;
+			bannerCount = 0;
+			
+			var firstImage = getFirstImage();
+		
+			var emailName = parseEmailName(firstImage);
+		
+			var rowNum = findRow(emailName);
+			
+			checkBanners(rowNum);
+		}
+		
+		
+		
+	}
+	
+	
+	function decreaseTabName(){
+		var newDay = tabName.substring(tabName.length-2,tabName.length);
+		newDay = newDay.replace('/','');
+		newDay = parseInt(newDay);
+		newDay--;
+		var newMonth = tabName.substring(0,tabName.length-2);
+		newMonth = newMonth.replace('/','');
+		 
+		
+		if(newDay == 0){
+			newMonth--;
+			if(newMonth == 0){
+				newMonth = 12;
+				newDay = 31;
+			}else if(newMonth == 2){
+				newDay = 29;
+			}else if((newMonth == 9) || (newMonth == 4) || (newMonth == 6) || (newMonth == 11)){
+				newDay = 30;
+			}else{
+				newDay = 31;
+			}	
+		}
+		
+		
+		tabName = newMonth+"/"+newDay;
+		
+		
+	}
+	
+	
+	
+	
+	/*Generate Email Code*/
 	
 	function generateCode(){
 		
@@ -97,9 +559,12 @@
 			
 			var thisCTA = ctaString.substring(0,endLine);
 			
-			
-			//Properly formats the links before adding them to array
-			linkArray[i] = buildCTA(thisCTA);		
+			if(thisCTA.indexOf("PrintPass") > -1){
+				printpass = buildCTA(thisCTA);
+			}else{
+				//Properly formats the links before adding them to array
+				linkArray[i] = buildCTA(thisCTA);	
+			}
 			
 			ctaString = ctaString.substring(endLine+1);
 			
@@ -157,8 +622,13 @@
 		var linkIndex = imageName.lastIndexOf("-");
 		
 		//Get the number of the associated link
-		var linkNumber = parseInt(imageName.substring(linkIndex+1))-1;
+		var linkNumber = parseInt(imageName.substring(linkIndex+1));
 		
+		if(linkNumber == "P" || linkNumber == "p"){
+			linkNumber = 0;
+		}
+		
+		linkNumber--;
 		
 		//Find the place in the image name with the index number corresponding to the image's place in the email
 		var imageIndex = imageName.lastIndexOf("_");
@@ -213,6 +683,10 @@
 			
 			var coreName = imageName.substring(0,endIndex);
 			
+			if(linkNumber == 0){
+				linkNumber = "P";
+			}
+			
 			var newName = coreName+"_"+imageNumber+"-"+linkNumber;
 			
 			
@@ -256,19 +730,30 @@
 		
 		var anim = new Image();
 		
+		
 		//If there is an available animated gif, add to image array and corresponding link to CTA array
 		anim.addEventListener("load", function(){
 			this.imgNum = imageNumber; //Findme
 
 			imageArray.push(this);
-			ctaArray.push(linkArray[(linkNumber+linkOffset)]);
 			
-			if(linkNumber >= nextOffset){
-				nextOffset = linkNumber+1;
+			
+			if(linkNumber > -1){
+				ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+				if(linkNumber >= nextOffset){
+					nextOffset = linkNumber+1;
+				}
+				linkNumber = 0;
+				imageNumber++;
+				getNextImage(imageName, linkNumber, imageNumber);
+			}else{
+				var passDate = imageName.substring(3,9);
+				
+				
+				
+				findPrintPass(imageName, linkNumber, imageNumber, passDate);
 			}
-			linkNumber = 1;
-			imageNumber++;
-			getNextImage(imageName, linkNumber, imageNumber);
+			
 			
 		});
 		
@@ -280,7 +765,86 @@
 		}
 	}
 	
-	
+	function findPrintPass(imageName, linkNumber, imageNumber, passDate){
+		
+		if(printpass == ""){
+			var pimg = new Image()
+			
+			pimg.addEventListener("load", function(){
+				alert();
+				printpass = 'http://s7d9.scene7.com/is/content/LordandTaylor/LT-Content/EVENTS/0-20'+passYear+'/'+passDate+'/'+passDate+'-PrintPass.pdf';
+				
+				printpass = buildCTA(printpass);
+				
+				ctaArray.push(printpass);
+			
+				if(linkNumber >= nextOffset){
+					nextOffset = linkNumber+1;
+				}
+				linkNumber = 0;
+				imageNumber++;
+				getNextImage(imageName, linkNumber, imageNumber);
+				
+			});
+			
+			var passYear = passDate.substring(4,6);
+			var passDay = passDate.substring(2,4);
+			var passMonth = passDate.substring(0,2);
+			
+			pimg.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+passDate+'-PrintPass?scl=1&qlt=100&fmt=jpg';
+			
+			pimg.onerror = function(){
+				newDay = parseInt(passDay);
+				newMonth = parseInt(passMonth);
+				newYear = parseInt(passYear);
+				
+				newDay--;
+				
+				if(newDay == 0){
+					newMonth--;
+					if(newMonth == 0){
+						newYear--;
+						newMonth = 12;
+						newDay = 31;
+					}else if(newMonth == 2){
+						newDay = 29;
+					}else if((newMonth == 9) || (newMonth == 4) || (newMonth == 6) || (newMonth == 11)){
+						newDay = 30;
+					}else{
+						newDay = 31;
+					}
+				}
+				
+				if(newDay < 10){
+					passDay = "0"+newDay;
+				}else{
+					passDay = newDay;
+				}
+				
+				if(newMonth < 10){
+					passMonth = "0"+newMonth;
+				}else{
+					passMonth = newMonth;
+				}
+				
+				passDate = passMonth+""+passDay+""+passYear;
+				
+				
+				findPrintPass(imageName, linkNumber, imageNumber, passDate);
+			}
+			
+		}else{
+			ctaArray.push(printpass);
+			
+			if(linkNumber >= nextOffset){
+				nextOffset = linkNumber+1;
+			}
+			linkNumber = 0;
+			imageNumber++;
+			getNextImage(imageName, linkNumber, imageNumber);
+		}
+		
+	}
 	
 	function getImageLink(imageName, linkNumber, imageNumber, imageWidth){		//Called by checkAnimation()
 		
@@ -291,23 +855,30 @@
 			this.imgNum = imageNumber;
 
 			imageArray.push(this);
-			ctaArray.push(linkArray[(linkNumber+linkOffset)]);
 			
-			if(linkNumber >= nextOffset){
-				nextOffset = linkNumber+1;
+			if(linkNumber > -1){
+				ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+				if(linkNumber >= nextOffset){
+					nextOffset = linkNumber+1;
+				}
+				linkNumber = 0;
+				imageNumber++;
+				getNextImage(imageName, linkNumber, imageNumber);
+			}else{
+				var passDate = imageName.substring(3,9);
+				
+				findPrintPass(imageName, linkNumber, imageNumber, passDate);
 			}
-			
-			linkNumber = 1;
-			imageNumber++;
-			
-			getNextImage(imageName,linkNumber,imageNumber);
 			
 		});
 		//Build the source link for the image
 		img.src="http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?scl=1"+"&qlt=100&fmt=jpg";
 		
 		//If there is no image available at this point, throw up an error
-		img.onerror = function(){alert("The image "+imageName+" was not found.");}
+		img.onerror = function(){alert("The image "+imageName+" was not found.");
+		document.getElementById('progressBar').style.marginRight = '250px';
+		document.getElementById('progressBar').innerHTML = '';
+		throw '';}
 	}
 	
 	
@@ -403,6 +974,9 @@
 				
 			}else{
 				alert("One or more images has incorrect dimensions");	//Throw an error for image widths greater than 600
+				document.getElementById('progressBar').style.marginRight = '250px';
+				document.getElementById('progressBar').innerHTML = '';
+				throw '';
 			}
 			
 		}
@@ -425,6 +999,11 @@
 		linkOffset = 0;
 		nextOffset = 0;
 		currentBanner = 0;
+		tabName = '';					
+		dateString = '';					
+		emailTable = '';					
+		bannerTable = '';				
+		linkString = '';			
 		
 	}
 	
@@ -489,6 +1068,11 @@
 	}
 	
 	
+	
+	
+	
+	/*Add Banner Code*/
+	
 	//Add input line to allow for an additional banner
 	function addBanner(){
 		
@@ -496,15 +1080,25 @@
 		
 		var bannerHTML ="";
 		
+		var bannerArray = new Array();
+		
 		for(var i = 1; i<= bannerCount; i++){
 			
+			if(i < (bannerCount)){
+				bannerArray[i] = document.getElementById("txtImage_"+i).value;
+			}
 			bannerHTML = bannerHTML+"<p style=\"margin-top:5px;\"><input placeholder=\"Paste file name of first image here\" type=\"text\" id=\"txtImage_"+i+"\" style=\"width:250px;\"></p>";
+			
+			
 			
 		}
 		
 		
-		
 		document.getElementById("bannerContainer").innerHTML = bannerHTML;
+		
+		for(var i = 1; i < bannerCount; i++){
+			document.getElementById("txtImage_"+i).value = bannerArray[i];
+		}
 		
 	}
 	
