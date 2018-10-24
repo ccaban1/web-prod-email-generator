@@ -622,11 +622,13 @@
 		var linkIndex = imageName.lastIndexOf("-");
 		
 		//Get the number of the associated link
-		var linkNumber = parseInt(imageName.substring(linkIndex+1));
+		var linkNumber = imageName.substring(linkIndex+1);
 		
 		if(linkNumber == "P" || linkNumber == "p"){
 			linkNumber = 0;
 		}
+		
+		linkNumber = parseInt(linkNumber);
 		
 		linkNumber--;
 		
@@ -761,6 +763,7 @@
 		
 		//If there is no corresponfing animation, build the link for a static image
 		anim.onerror = function(){
+			
 			getImageLink(imageName, linkNumber, imageNumber, imageWidth);
 		}
 	}
@@ -875,9 +878,10 @@
 		img.src="http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?scl=1"+"&qlt=100&fmt=jpg";
 		
 		//If there is no image available at this point, throw up an error
-		img.onerror = function(){alert("The image "+imageName+" was not found.");
-		document.getElementById('progressBar').style.marginRight = '250px';
-		document.getElementById('progressBar').innerHTML = '';
+		img.onerror = function(){
+			alert("The image "+imageName+" was not found.");
+			document.getElementById('progressBar').style.marginRight = '250px';
+			document.getElementById('progressBar').innerHTML = '';
 		throw '';}
 	}
 	
