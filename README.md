@@ -32,10 +32,10 @@ The Add Banner button creates additional fields for adding image names in order 
 If the first image in the email is 11_042318_AWESOME_EMAIL_1-1, the first image for a banner appearing in the email should be 11_042318_GREAT_BANNER_1-1. Links for the banner should go into the Links text area in the same order as the associated
 images. If the banner goes above the main body of the email, the banner links should be above the email body links in the text box.
 
-###Auto-fill
+### Auto-fill
 The Auto-fill button will automatically find and add any banners associated with the email in the Google Doc, as well as fill out the linking for the email and all associated banners.
 
-**Notes***
+**Notes**
 1. Auto-fill will not work if an email requires pulling elements from some other emails
 2. Atypical or non-standard information or requests in Prod Notes on the Google Doc may cause Auto-fill to fail
 3. In the event that Auto-fill encounters a problem, it will alert you, and you should still be able to fill out the information manually
@@ -47,9 +47,9 @@ The Generate Email button will run the script, which takes the links and image n
 1. The script cannot handle text boxes or barcodes in emails
 
 
-##Additional Information
+## Additional Information
 
-###Print Pass
+### Print Pass
 
 **Naming**
 If an email contains a print pass link, the final number in the naming convention (Z in the explanation above) should be replaced by the letter ‘P’ with the numbering resuming where it left off after that if applicable.
