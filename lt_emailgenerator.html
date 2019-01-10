@@ -109,7 +109,7 @@
 					
 					if(emailTable.getDataTable().getValue(rowNum,columnNum+1) == null){
 						moreRows = false;
-						linkString = linkString+'\n';
+						linkString = linkString + '\n';
 					}else{
 						columnNum++;
 						linkString = linkString+'\n';
@@ -137,6 +137,8 @@
 			}
 			
 		}
+
+		linkString = linkString.substring(0,linkString.length-2);
 		
 		document.getElementById('txtCTA').value = linkString;
 		
@@ -186,7 +188,7 @@
 
 								var newBanner = bannerInfo.substring(bannerStart,bannerEnd);
 
-								if(bannerInfo.substring(0,bannerStart).indexOf("ABOVE HERO") > -1){
+								if((bannerInfo.substring(0,bannerStart).indexOf("ABOVE HERO") > -1)){
 									addBanner();
 									var bannerId = "txtImage_"+bannerCount;
 									var lastBannerId = "txtImage_"+(bannerCount-1);
@@ -555,18 +557,22 @@
 		
 		progressIncrement = Math.floor(100 / numberOfLines);
 		
-		
+		var printpassOffset = 0;
+
 		//Break up the CTAs by line break and add them to link Array
 		for(var i = 0; i< numberOfLines; i++){
+
 			var endLine = ctaString.indexOf("\n");
 			
 			var thisCTA = ctaString.substring(0,endLine);
+
 			
 			if(thisCTA.indexOf("PrintPass") > -1){
+				printpassOffset++;
 				printpass = buildCTA(thisCTA);
 			}else{
 				//Properly formats the links before adding them to array
-				linkArray[i] = buildCTA(thisCTA);	
+				linkArray[i-printpassOffset] = buildCTA(thisCTA);	
 			}
 			
 			ctaString = ctaString.substring(endLine+1);
@@ -723,15 +729,18 @@
 	
 	function checkAnimation(imageName, linkNumber, imageNumber, imageWidth){		//Called by checkAnimation()
 		
-		var startURL = "http://image.s5a.com/is/content/LordandTaylor/EMAIL/2018/Week%20";
+
+		var startURL = "http://image.s5a.com/is/content/LordandTaylor/EMAIL/20";
 		
+		var yearNumber = parseInt(imageName.substring(7,9));
+
 		//Get the week number for the folder name from the name of the image
-		var weekNumber = parseInt(imageName.substring(0,2));
+		var weekNumber = "/Week%20" + parseInt(imageName.substring(0,2));
 		
 		//Change underscores to conform to animated link format
 		var animationName = imageName.replace(/_/g,"%5F");
 		
-		var srcAnimation = startURL+weekNumber+"/"+animationName+".gif";
+		var srcAnimation = startURL+yearNumber+weekNumber+"/"+animationName+".gif";
 		
 		var anim = new Image();
 		
@@ -771,13 +780,12 @@
 		}
 	}
 	
-	function findPrintPass(imageName, linkNumber, imageNumber, passDate){
+	function findPrintPass(imageName, linkNumber, imageNumber, passDate){ //Called by checkAnimation, getImageLink
 		
 		if(printpass == ""){
 			var pimg = new Image()
 			
 			pimg.addEventListener("load", function(){
-				alert();
 				printpass = 'http://s7d9.scene7.com/is/content/LordandTaylor/LT-Content/EVENTS/0-20'+passYear+'/'+passDate+'/'+passDate+'-PrintPass.pdf';
 				
 				printpass = buildCTA(printpass);
@@ -797,7 +805,7 @@
 			var passDay = passDate.substring(2,4);
 			var passMonth = passDate.substring(0,2);
 			
-			pimg.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+passDate+'-PrintPass?scl=1&qlt=100&fmt=jpg';
+			pimg.src = 'http://s7d9.scene7.com/is/image/LordandTaylor/'+passDate+'-PrintPass?wid=1&qlt=100&fmt=jpg';
 			
 			pimg.onerror = function(){
 				newDay = parseInt(passDay);
