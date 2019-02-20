@@ -63,6 +63,7 @@
 	var currentBanner = 0;			//Current banner being worked on
 	
 	var linkOffset = 0;				//Total number of links in all previous banners
+	var linkOrderOffset = 0;		//Number of links that break sequence with their paired images, i.e. don't match 1-1, 2-2, etc.
 	var nextOffset = 0;				//Number of links in the current banner
 
 	//Variables controlling the loading percentage
@@ -687,9 +688,18 @@
 				checkAnimation(imageName, linkNumber, imageNumber, this.naturalWidth);
 				
 			}else{
-				linkNumber++;
-			 
-			 	getNextImage(imageName, linkNumber, imageNumber);
+				
+				if(linkNumber+linkOrderOffset == (imageNumber-1)){
+					linkNumber = 0;
+					linkOrderOffset++;
+				}else if(linkNumber+linkOrderOffset == (imageNumber - 2)){
+					linkNumber += 3;
+				}else{
+
+					linkNumber+=2;
+				}
+				
+				getNextImage(imageName, linkNumber, imageNumber);
 			}
 			
 		});
@@ -698,8 +708,16 @@
 		
 		//If there is no valid image, check the next possible file name in sequence
 		img.onerror = function(){
-			
-			linkNumber+=2;
+			if(linkNumber+linkOrderOffset == (imageNumber-1)){
+				linkNumber = 0;
+				linkOrderOffset++;
+			}else if(linkNumber+linkOrderOffset == (imageNumber - 2)){
+				linkNumber += 3;
+			}else{
+
+				linkNumber+=2;
+			}
+
 			getNextImage(imageName, linkNumber, imageNumber);
 		}
 		
@@ -709,7 +727,7 @@
 	function getNextImage(imageName, linkNumber, imageNumber){		//Called by checkImage(), getImageLink()
 		
 		//Generate the next possible image name in sequence. If all possible names have been used up, generate the email
-		if((linkNumber+linkOffset) <= linkArray.length){
+		if((linkNumber+linkOffset-linkOrderOffset) <= linkArray.length){
 			var endIndex = imageName.lastIndexOf("_");
 			
 			var coreName = imageName.substring(0,endIndex);
@@ -777,8 +795,8 @@
 				if(linkNumber >= nextOffset){
 					nextOffset = linkNumber+1;
 				}
-				linkNumber = 0;
 				imageNumber++;
+				linkNumber = imageNumber - linkOrderOffset;
 				getNextImage(imageName, linkNumber, imageNumber);
 			}else{
 				var passDate = imageName.substring(3,9);
@@ -873,8 +891,8 @@
 			if(linkNumber >= nextOffset){
 				nextOffset = linkNumber+1;
 			}
-			linkNumber = 0;
 			imageNumber++;
+			linkNumber = imageNumber - linkOrderOffset;
 			getNextImage(imageName, linkNumber, imageNumber);
 		}
 		
@@ -899,7 +917,7 @@
 			if(pngSize > jpgSize){
 				var img2 = new Image();
 				img2.src = "http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?scl=1"+"&qlt=97&fmt=jpg";
-				
+
 				img2.imgNum = imageNumber;
 				imageArray.push(img2);
 
@@ -917,8 +935,8 @@
 				if(linkNumber >= nextOffset){
 					nextOffset = linkNumber+1;
 				}
-				linkNumber = 0;
 				imageNumber++;
+				linkNumber = imageNumber -linkOrderOffset;
 				getNextImage(imageName, linkNumber, imageNumber);
 			}else{
 				var passDate = imageName.substring(3,9);
@@ -1081,7 +1099,8 @@
 		dateString = '';					
 		emailTable = '';					
 		bannerTable = '';				
-		linkString = '';			
+		linkString = '';	
+		linkOrderOffset = 0;		
 		
 	}
 	
