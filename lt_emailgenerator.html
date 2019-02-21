@@ -42,6 +42,7 @@
 <textarea id="finalOutput" style="white-space: pre-wrap; width:350px; height:350px; resize:vertical;"></textarea>
 <br><span style="margin-right:250px;" id="progressBar"></span><br>
 <button onclick="copyCode()">Copy</button>
+<button onclick="openPreview()">Preview</button>
 </div>
 </div></center>
 </body>
@@ -639,6 +640,8 @@
 		
 		var fileName = document.getElementById('txtImage_'+currentBanner).value;		//Get initial image name from user input
 		
+		linkOrderOffset = 0;
+
 		return fileName;
 		
 	}
@@ -916,33 +919,58 @@
 
 			if(pngSize > jpgSize){
 				var img2 = new Image();
-				img2.src = "http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?scl=1"+"&qlt=97&fmt=jpg";
+				
 
+			img2.addEventListener("load",function(){
 				img2.imgNum = imageNumber;
+				img2.naturalWidth
 				imageArray.push(img2);
+
+
+
+				if(linkNumber > -1){
+					ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+					if(linkNumber >= nextOffset){
+						nextOffset = linkNumber+1;
+					}
+					imageNumber++;
+					linkNumber = imageNumber -linkOrderOffset;
+					getNextImage(imageName, linkNumber, imageNumber);
+				}else{
+					var passDate = imageName.substring(3,9);
+					
+					findPrintPass(imageName, linkNumber, imageNumber, passDate);
+				}
+
+
+			});
+
+			img2.src = "http://image.s5a.com/is/image/LordandTaylor/"+imageName+"?scl=1"+"&qlt=97&fmt=jpg";
 
 			}else{
 				this.imgNum = imageNumber;
-
+				alert(this.naturalWidth);
 				imageArray.push(this);
+
+				if(linkNumber > -1){
+					ctaArray.push(linkArray[(linkNumber+linkOffset)]);
+					if(linkNumber >= nextOffset){
+						nextOffset = linkNumber+1;
+					}
+					imageNumber++;
+					linkNumber = imageNumber -linkOrderOffset;
+					getNextImage(imageName, linkNumber, imageNumber);
+				}else{
+					var passDate = imageName.substring(3,9);
+					
+					findPrintPass(imageName, linkNumber, imageNumber, passDate);
+				}
 			}
 			
 
 			
 			
-			if(linkNumber > -1){
-				ctaArray.push(linkArray[(linkNumber+linkOffset)]);
-				if(linkNumber >= nextOffset){
-					nextOffset = linkNumber+1;
-				}
-				imageNumber++;
-				linkNumber = imageNumber -linkOrderOffset;
-				getNextImage(imageName, linkNumber, imageNumber);
-			}else{
-				var passDate = imageName.substring(3,9);
-				
-				findPrintPass(imageName, linkNumber, imageNumber, passDate);
-			}
+			
 			
 		});
 		//Build the source link for the image
@@ -1024,7 +1052,7 @@
 				//Iterate through images until all images are checked, the total width for the table exceeds what is allowed or you come to an image with a non-matching height
 				for(var u = i; u < imageArray.length && totalWidth < 600 && imageArray[u].naturalHeight == cellHeight; u++){
 					totalWidth += imageArray[u].naturalWidth;
-					
+
 					//Build the table cell for the image
 					if(totalWidth <= 600){
 						var cellOpen = "\n        <td align=\"center\" style=\"line-height:0px; font-size:0px;\"><a \nhref=\"";
@@ -1162,6 +1190,15 @@
 		
 		document.execCommand("Copy");
 		
+	}
+
+
+	//Opens window to preview outputted html
+	function openPreview(){
+		var htmlEmail = document.getElementById("finalOutput").value;
+
+		var wnd = window.open("","","width=700,height=800");
+		wnd.document.write(htmlEmail);
 	}
 	
 	
